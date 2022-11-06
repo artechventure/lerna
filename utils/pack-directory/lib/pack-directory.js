@@ -1,5 +1,6 @@
 "use strict";
 
+const fs = require("fs-extra");
 const path = require("path");
 const packlist = require("npm-packlist");
 const log = require("npmlog");
@@ -50,9 +51,12 @@ function packDirectory(_pkg, dir, options) {
 
   chain = chain.then(() => runLifecycle(pkg, "prepack", opts));
   chain = chain.then(() => pkg.refresh());
+
+  chain = chain.then(() => overwritePublishConfig(pkg.manifestLocation));
   chain = chain.then(() => packlist({ path: pkg.contents }));
-  chain = chain.then((files) =>
-    tar.create(
+
+  chain = chain.then((files) => {
+    return tar.create(
       {
         cwd: pkg.contents,
         prefix: "package/",
@@ -66,8 +70,8 @@ function packDirectory(_pkg, dir, options) {
       //       specifically with @ signs, so we just neutralize that one
       //       and any such future "features" by prepending `./`
       files.map((f) => `./${f}`)
-    )
-  );
+    );
+  });
   chain = chain.then((stream) => tempWrite(stream, getTarballName(pkg)));
   chain = chain.then((tarFilePath) =>
     getPacked(pkg, tarFilePath).then((packed) =>
@@ -78,6 +82,29 @@ function packDirectory(_pkg, dir, options) {
   );
 
   return chain;
+}
+
+function overwritePublishConfig(manifestLocation) {
+  const manifest = fs.readJSONSync(manifestLocation);
+  if (manifest.publishConfig === undefined) {
+    return;
+  }
+  if (typeof manifest.publishConfig !== "object") {
+    return;
+  }
+
+  ["type", "main", "browser", "module", "exports", "bin", "types", "typings"].forEach((key) => {
+    if (key in manifest.publishConfig) {
+      manifest[key] = manifest.publishConfig[key];
+      delete manifest.publishConfig[key];
+    }
+  });
+
+  if (Object.keys(manifest.publishConfig).length === 0) {
+    delete manifest.publishConfig;
+  }
+
+  fs.writeJSONSync(manifestLocation, manifest);
 }
 
 function getTarballName(pkg) {

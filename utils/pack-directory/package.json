@@ -31,6 +31,7 @@
     "@lerna/package": "file:../../core/package",
     "@lerna/run-lifecycle": "file:../run-lifecycle",
     "@lerna/temp-write": "file:../../utils/temp-write",
+    "fs-extra": "^10.1.0",
     "npm-packlist": "^5.1.1",
     "npmlog": "^6.0.2",
     "tar": "^6.1.0"
